@@ -29,6 +29,10 @@
          stroke: rgba(0, 0, 255, 1);
      }
 
+     .credarea {
+         fill: blue;
+     }
+
      #slider-ui {
          float: left;
          width: 555px;
@@ -110,19 +114,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.16.3/math.js"></script>
 
     <script type="text/javascript">
      $(".spinner").spinner();
 
-     function gamma(x) {
-         // Calculates the Gamma function for x.
-         // Thanks to http://stackoverflow.com/questions/15454183/how-to-make-a-function-that-computes-the-factorial-for-numbers-with-decimals.
-         return Math.sqrt(2 * Math.PI / x) * Math.pow((x + 1 / (12 * x - 1 / (10 * x))) / Math.E, x);
-     }
-
      function betaPDF(x, alpha, beta) {
-         // The Beta probability density function.
-         return Math.pow(x, alpha - 1) * Math.pow(1 - x, beta - 1) * gamma(alpha + beta) / (gamma(alpha) * gamma(beta));
+         return Math.pow(x, alpha - 1) * Math.pow(1 - x, beta - 1) * math.gamma(alpha + beta) / (math.gamma(alpha) * math.gamma(beta));
      }
 
      function arrayOf2DimArrays(xval, yval, xscale, yscale) {
@@ -197,17 +195,6 @@
                      .attr("height", height);
          var g = vis.append("svg:g");
 
-         // Calculate x and y, arrays giving points on the Beta PDF.
-         var x = [];
-         var y = [];
-         for (var xi = 0; xi <= 1; xi = xi + 0.01) {
-             yi = betaPDF(xi, alpha, beta)
-             if (isFinite(yi)) {
-                 x.push(xi);
-                 y.push(yi);
-             }
-         }
-
          // Create the rescaling transformations.
          var xTransform = d3.scale.linear()
                             .domain([0, 1])
@@ -215,6 +202,35 @@
          var yTransform = d3.scale.linear()
                             .domain([maxY, 0])
                             .range([0 + margin, height - margin]);
+
+         // Calculate x and y, arrays giving points on the Beta PDF.
+         var x = [];
+         var y = [];
+         var credxy = []
+         var credx = 1;
+         var credarea = 0;
+         var credfirst = true;
+         for (var xi = 0; xi <= 1; xi = xi + 0.01) {
+             yi = betaPDF(xi, alpha, beta)
+             if (isFinite(yi)) {
+                 x.push(xi);
+                 y.push(yi);
+             }
+             credarea = credarea + yi * 0.01;
+             if (credarea > 0.05) {
+                 if (credfirst) {
+                     credx = xi;
+                     credxy.push([xTransform(xi), yTransform(0)])
+                     credfirst = false;
+                 }
+                 if (isFinite(yi)) {
+                     credxy.push([xTransform(xi), yTransform(yi)])
+                 } else {
+                     credxy.push([xTransform(xi), height])
+                 }
+             }
+         }
+         credxy.push([xTransform(1), yTransform(0)]);
 
          // X-axis.
          var xAxis = d3.svg.axis().scale(xTransform).orient("bottom");
@@ -230,7 +246,15 @@
           .attr("transform", "translate(" + margin + ",0)")
           .call(yAxis);
 
-         // Draw the Beta PDF.
+         // cred X value
+         g.append("text")
+            .attr("class", "x label")
+            .attr("text-anchor", "middle")
+            .attr("x", xTransform(credx))
+            .attr("y", height - 6)
+            .text(credx.toFixed(2));
+
+         // Draw the Beta PDF and credible area.
          var lineFunction = d3.svg.line()
                               .x(function(d) {
                                   return d[0];
@@ -242,6 +266,9 @@
          g.append("path")
           .attr("class", "betaline")
           .attr("d", lineFunction(arrayOf2DimArrays(x, y, xTransform, yTransform)))
+         g.append("path")
+          .attr("class", "credarea")
+          .attr("d", lineFunction(credxy))
      }
 
      drawBeta();
