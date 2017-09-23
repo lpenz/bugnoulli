@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+
+    <title>Bug probability calculator</title>
+
+    <style>
+     .axis path,
+     .axis line {
+         stroke: black;
+         fill: none;
+         shape-rendering: crispEdges;
+     }
+
+     .axis text {
+         font-family: sans-serif;
+         font-size: 14px;
+     }
+
+     .betaline {
+         fill: none;
+         stroke-width: 2;
+         stroke: rgba(0, 0, 255, 1);
+     }
+
+     #slider-ui {
+         float: left;
+         width: 555px;
+     }
+
+     .slider-container {
+         float: left;
+         width: 100%;
+         border: 1px solid #ddd;
+         padding: 10px;
+         margin-top: 10px;
+     }
+
+     .slider-label {
+         float: left;
+         width: 50px;
+         font-family: sans-serif;
+         font-size: 14px;
+     }
+
+     .slider-val {
+         float: left;
+         width: 60px;
+         border: 0px;
+     }
+
+     .slider {
+         margin-top: 2px;
+         float: left;
+         width: 400px;
+     }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <a class="navbar-brand" href="#">Bug probability calculator</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsBugprob" aria-controls="navbarsBugprob" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarsBugprob">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="#">Home <span class="sr-only">(current)</span></a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div id="slider-ui">
+            <div class="slider-container">
+                <label class="slider-label" for="k-val">k:</label>
+                <input class="spinner" id="k-val" type="text" value="5.00">
+            </div>
+            <div class="slider-container">
+                <label class="slider-label" for="alpha-val">Alpha:</label>
+                <input class="slider-val" id="alpha-val" type="text" readonly value="5.00">
+                <div class="slider" id="alpha-slider"></div>
+            </div>
+            <div class="slider-container">
+                <label class="slider-label" for="beta-val">Beta:</label>
+                <input class="slider-val" id="beta-val" type="text" readonly value="5.00">
+                <div class="slider" id="beta-slider"></div>
+            </div>
+            <div class="slider-container">
+                <label class="slider-label" for="y-val">Max Y:</label>
+                <input class="slider-val" id="y-val" type="text" readonly value="3">
+                <div class="slider" id="y-slider"></div>
+            </div>
+        </div>
+
+        <div id="vis"></div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+
+    <script type="text/javascript">
+     $(".spinner").spinner();
+
+     function gamma(x) {
+         // Calculates the Gamma function for x.
+         // Thanks to http://stackoverflow.com/questions/15454183/how-to-make-a-function-that-computes-the-factorial-for-numbers-with-decimals.
+         return Math.sqrt(2 * Math.PI / x) * Math.pow((x + 1 / (12 * x - 1 / (10 * x))) / Math.E, x);
+     }
+
+     function betaPDF(x, alpha, beta) {
+         // The Beta probability density function.
+         return Math.pow(x, alpha - 1) * Math.pow(1 - x, beta - 1) * gamma(alpha + beta) / (gamma(alpha) * gamma(beta));
+     }
+
+     function arrayOf2DimArrays(xval, yval, xscale, yscale) {
+         // Converts an array of x-axis values and an array of y-axis values into an array of coordinates.
+         // E.g. xval=[1, 2, 3] and yval=[11, 12, 13] -> [[xscale(1), yscale(11)], [xscale(2), yscale(12)], [xscale(3), yscale(13)]]
+         var arr = [];
+         for (var i = 0; i < xval.length; i++) {
+             arr.push([xscale(xval[i]), yscale(yval[i])]);
+         }
+         return arr;
+     }
+
+     // Set up the slider for the alpha parameter.
+     $(function() {
+         $("#alpha-slider").slider({
+             range: "min",
+             value: 500,
+             min: 1,
+             max: 1000,
+             slide: function(event, ui) {
+                 $("#alpha-val").val((0.01 * ui.value).toFixed(2));
+                 drawBeta();
+             }
+         });
+     });
+
+     // Set up the slider for the beta parameter.
+     $(function() {
+         $("#beta-slider").slider({
+             range: "min",
+             value: 500,
+             min: 1,
+             max: 1000,
+             slide: function(event, ui) {
+                 $("#beta-val").val((0.01 * ui.value).toFixed(2));
+                 drawBeta();
+             }
+         });
+     });
+
+     // Set up the slider for the y scale parameter. 
+     $(function() {
+         $("#y-slider").slider({
+             range: "min",
+             value: 3,
+             min: 1,
+             max: 10,
+             slide: function(event, ui) {
+                 $("#y-val").val(ui.value.toFixed(0));
+                 drawBeta();
+             }
+         });
+     });
+
+     function drawBeta() {
+         var width = 600,
+             height = 400,
+             margin = 40;
+
+         // Get the parameters from the sliders.
+         var alpha = Number($("#alpha-val").val());
+         var beta = Number($("#beta-val").val());
+         var maxY = Number($("#y-val").val());
+
+         if (d3.select("svg") != false) {
+             d3.select("svg").remove();
+         }
+
+         var vis = d3.select("#vis")
+                     .append("svg:svg")
+                     .attr("width", width)
+                     .attr("height", height);
+         var g = vis.append("svg:g");
+
+         // Calculate x and y, arrays giving points on the Beta PDF.
+         var x = [];
+         var y = [];
+         for (var xi = 0; xi <= 1; xi = xi + 0.01) {
+             yi = betaPDF(xi, alpha, beta)
+             if (isFinite(yi)) {
+                 x.push(xi);
+                 y.push(yi);
+             }
+         }
+
+         // Create the rescaling transformations.
+         var xTransform = d3.scale.linear()
+                            .domain([0, 1])
+                            .range([0 + margin, width - margin]);
+         var yTransform = d3.scale.linear()
+                            .domain([maxY, 0])
+                            .range([0 + margin, height - margin]);
+
+         // X-axis.
+         var xAxis = d3.svg.axis().scale(xTransform).orient("bottom");
+         g.append("g")
+          .attr("class", "axis")
+          .attr("transform", "translate(0," + (height - margin) + ")")
+          .call(xAxis);
+
+         // Y-axis.
+         var yAxis = d3.svg.axis().scale(yTransform).orient("left");
+         g.append("g")
+          .attr("class", "axis")
+          .attr("transform", "translate(" + margin + ",0)")
+          .call(yAxis);
+
+         // Draw the Beta PDF.
+         var lineFunction = d3.svg.line()
+                              .x(function(d) {
+                                  return d[0];
+                              })
+                              .y(function(d) {
+                                  return d[1];
+                              })
+                              .interpolate("linear");
+         g.append("path")
+          .attr("class", "betaline")
+          .attr("d", lineFunction(arrayOf2DimArrays(x, y, xTransform, yTransform)))
+     }
+
+     drawBeta();
+    </script>
+
+</body>
+
+</html>
