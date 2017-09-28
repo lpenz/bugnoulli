@@ -98,21 +98,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.16.3/math.js"></script>
 
     <script type="text/javascript">
-        function betaPDF(x, alpha, beta) {
-            if (alpha + beta > 120) {
-                var bigalpha = math.bignumber(alpha)
-                var bigbeta = math.bignumber(beta)
-                var betafuncval = math.divide(math.gamma(math.add(bigalpha, bigbeta)),
-                    (math.multiply(math.gamma(bigalpha),
-                        math.gamma(bigbeta))));
-            } else {
-                var betafuncval = math.gamma(alpha + beta) /
-                    (math.gamma(alpha) * math.gamma(beta));
-            }
-            return Math.pow(x, alpha - 1) *
-                Math.pow(1 - x, beta - 1) *
-                betafuncval;
-        }
+        // Conectors: //////////////////////////////////////
 
         $("#k").change(function() {
             var k = Number($("#k").val());
@@ -127,7 +113,7 @@
             $("#n").val(n);
             $("#alpha").val(k + 1);
             $("#beta").val(n - k + 1);
-            drawBeta();
+            updateBeta();
         });
 
         $("#n").change(function() {
@@ -143,18 +129,113 @@
             $("#n").val(n);
             $("#alpha").val(k + 1);
             $("#beta").val(n - k + 1);
-            drawBeta();
+            updateBeta();
         });
 
         $("#alpha").change(function() {
-            drawBeta();
+            updateBeta();
         });
 
         $("#beta").change(function() {
-            drawBeta();
+            updateBeta();
         });
 
-        function drawBeta() {
+        // Math: ////////////////////////////////////
+
+        function betaPDF(x, alpha, beta) {
+            // Function that calculates the beta distribution y from x and parameters
+            if (alpha + beta > 120) {
+                var bigalpha = math.bignumber(alpha)
+                var bigbeta = math.bignumber(beta)
+                var betafuncval = math.divide(math.gamma(math.add(bigalpha, bigbeta)),
+                    (math.multiply(math.gamma(bigalpha),
+                        math.gamma(bigbeta))));
+            } else {
+                var betafuncval = math.gamma(alpha + beta) /
+                    (math.gamma(alpha) * math.gamma(beta));
+            }
+            return Math.pow(x, alpha - 1) *
+                Math.pow(1 - x, beta - 1) *
+                betafuncval;
+        }
+
+        function calcBeta(alpha, beta) {
+            // Calculate x and y, arrays giving points on the Beta PDF.
+            var meanX = alpha / (alpha + beta);
+            var maxY = 1.1 * betaPDF(meanX, alpha, beta);
+            var linexy = [];
+            var credxy = []
+            var credx = 1;
+            var credarea = 0;
+            var credfirst = true;
+            for (var xi = 0; xi <= 1; xi = xi + 0.001) {
+                yi = betaPDF(xi, alpha, beta)
+                if (isFinite(yi)) {
+                    linexy.push([xi, yi]);
+                }
+                credarea = credarea + yi * 0.001;
+                if (credarea > 0.05) {
+                    if (credfirst) {
+                        credx = xi;
+                        credxy.push([xi, 0]);
+                        credfirst = false;
+                    }
+                    if (isFinite(yi)) {
+                        credxy.push([xi, yi]);
+                    } else {
+                        credxy.push([xi, maxY]);
+                    }
+                }
+            }
+            credxy.push([1, 0]);
+            return [linexy, credxy];
+        }
+
+        // Draw using d3: ///////////////////////////
+
+        function updateBeta() {
+            var width = 800,
+                height = 400,
+                margin = 40;
+
+            var alpha = Number($("#alpha").val());
+            var beta = Number($("#beta").val());
+            var meanX = alpha / (alpha + beta);
+            var maxY = 1.1 * betaPDF(meanX, alpha, beta);
+
+            var xscale = d3.scale.linear()
+                .domain([0, 1])
+                .range([0 + margin, width - margin]);
+            var yscale = d3.scale.linear()
+                .domain([maxY, 0])
+                .range([0 + margin, height - margin]);
+
+            // Draw the Beta PDF and credible area.
+            var lineFunction = d3.svg.line()
+                .x(function(d) {
+                    return xscale(d[0]);
+                })
+                .y(function(d) {
+                    return yscale(d[1]);
+                })
+                .interpolate("linear");
+
+            var calcbeta = calcBeta(alpha, beta);
+            var linexy = calcbeta[0];
+            var credxy = calcbeta[1];
+            d3.select("path.betaline")
+                .transition()
+                .attr("d", lineFunction(linexy));
+
+            // Y-axis.
+            var yAxis = d3.svg.axis().scale(yscale).orient("left");
+            d3.select("g.yaxis")
+                .transition()
+                .attr("transform", "translate(" + margin + ",0)")
+                .call(yAxis);
+        }
+
+        function initBeta() {
             var width = 800,
                 height = 400,
                 margin = 40;
@@ -165,16 +246,6 @@
             var mean = alpha / (alpha + beta);
             var maxY = 1.1 * betaPDF(mean, alpha, beta);
 
-            if (d3.select("svg") != false) {
-                d3.select("svg").remove();
-            }
-
-            var vis = d3.select("#vis")
-                .append("svg:svg")
-                .attr("width", width)
-                .attr("height", height);
-            var g = vis.append("svg:g");
-
             // Create the rescaling transformations.
             var xscale = d3.scale.linear()
                 .domain([0, 1])
@@ -183,73 +254,57 @@
                 .domain([maxY, 0])
                 .range([0 + margin, height - margin]);
 
-            // Calculate x and y, arrays giving points on the Beta PDF.
-            var linexy = [];
-            var credxy = []
-            var credx = 1;
-            var credarea = 0;
-            var credfirst = true;
-            for (var xi = 0; xi <= 1; xi = xi + 0.001) {
-                yi = betaPDF(xi, alpha, beta)
-                if (isFinite(yi)) {
-                    linexy.push([xscale(xi), yscale(yi)]);
-                }
-                credarea = credarea + yi * 0.001;
-                if (credarea > 0.05) {
-                    if (credfirst) {
-                        credx = xi;
-                        credxy.push([xscale(xi), yscale(0)])
-                        credfirst = false;
-                    }
-                    if (isFinite(yi)) {
-                        credxy.push([xscale(xi), yscale(yi)])
-                    } else {
-                        credxy.push([xscale(xi), height])
-                    }
-                }
-            }
-            credxy.push([xscale(1), yscale(0)]);
+            // Draw the Beta PDF and credible area.
+            var lineFunction = d3.svg.line()
+                .x(function(d) {
+                    return xscale(d[0]);
+                })
+                .y(function(d) {
+                    return yscale(d[1]);
+                })
+                .interpolate("linear");
+
+            var vis = d3.select("#vis")
+                .append("svg:svg")
+                .attr("width", width)
+                .attr("height", height);
+            var g = vis.append("svg:g");
+
+            var calcbeta = calcBeta(alpha, beta, xscale, yscale);
+            var linexy = calcbeta[0];
+            var credxy = calcbeta[1];
 
             // X-axis.
             var xAxis = d3.svg.axis().scale(xscale).orient("bottom");
             g.append("g")
-                .attr("class", "axis")
+                .attr("class", "axis xaxis")
                 .attr("transform", "translate(0," + (height - margin) + ")")
                 .call(xAxis);
 
             // Y-axis.
             var yAxis = d3.svg.axis().scale(yscale).orient("left");
             g.append("g")
-                .attr("class", "axis")
+                .attr("class", "axis yaxis")
                 .attr("transform", "translate(" + margin + ",0)")
                 .call(yAxis);
 
             // cred X value
-            g.append("text")
-                .attr("class", "x label")
-                .attr("text-anchor", "middle")
-                .attr("x", xscale(credx))
-                .attr("y", height - 6)
-                .text(credx.toFixed(3));
+            /* g.append("text")*/
+            /* .attr("class", "x label")*/
+            /* .attr("text-anchor", "middle")*/
+            /* .attr("x", xscale(credx))*/
+            /* .attr("y", height - 6)*/
+            /* .text(credx.toFixed(3));*/
 
-            // Draw the Beta PDF and credible area.
-            var lineFunction = d3.svg.line()
-                .x(function(d) {
-                    return d[0];
-                })
-                .y(function(d) {
-                    return d[1];
-                })
-                .interpolate("linear");
             g.append("path")
                 .attr("class", "betaline")
                 .attr("d", lineFunction(linexy));
-            g.append("path")
-                .attr("class", "credarea")
-                .attr("d", lineFunction(credxy));
+            /* g.append("path")*/
+            /* .attr("class", "credarea")*/
+            /* .attr("d", lineFunction(credxy));*/
         }
 
-        drawBeta();
+        initBeta();
     </script>
 
 </body>
