@@ -4,21 +4,246 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <meta name="author" content="Leandro Lisboa Penz" />
     <meta name="description" content="bugnoulli" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.min.css">
+
     <title>bugnoulli</title>
+
+    <style>
+        .axis path,
+        .axis line {
+            stroke: black;
+            fill: none;
+            shape-rendering: crispEdges;
+        }
+
+        .axis text {
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+
+        .betaline {
+            fill: none;
+            stroke-width: 2;
+            stroke: rgba(0, 0, 255, 1);
+        }
+
+        .credarea {
+            fill: blue;
+        }
+
+        .controls-container {
+            float: left;
+            width: 100%;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 
 <body>
 
-    <h1>bugnoulli</h1>
+    <div class="container">
 
-    Work in progress.
+        <h1>bugnoulli</h1>
 
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+        <form>
+            <p>
+                There were
+                <input id="k" type="number" value="1" /> instances in
+                <input id="n" type="number" value="5" /> attempts</p>
+            <p>
+                The distribution of \(p\) of the corresponding binomial distribution has the following shape:
+            </p>
+        </form>
+
+        <svg id="vis">
+        <g>
+          <g class="axis xaxis"/>
+          <g class="axis yaxis"/>
+          <path class="betaline"/>
+        </g>
+
+        <p>
+          <form>
+            <input id="alpha" type="hidden" value="2" />
+            <input id="beta" type="hidden" value="5" />
+          </form>
+      </svg>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js" charset="utf-8"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/3.16.3/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" async></script>
+
+    <script type="text/javascript">
+        /* Get inputs for graph: **************************************************************/
+
+        $("#k").change(function() {
+            var k = Number($("#k").val());
+            var n = Number($("#n").val());
+            if (k < 0) {
+                k = 0;
+            }
+            if (n < k) {
+                n = k;
+            }
+            $("#k").val(k);
+            $("#n").val(n);
+            $("#alpha").val(k + 1);
+            $("#beta").val(n - k + 1);
+            updateBeta();
+        });
+
+        $("#n").change(function() {
+            var k = Number($("#k").val());
+            var n = Number($("#n").val());
+            if (n < 1) {
+                n = 1;
+            }
+            if (n < k) {
+                k = n;
+            }
+            $("#k").val(k);
+            $("#n").val(n);
+            $("#alpha").val(k + 1);
+            $("#beta").val(n - k + 1);
+            updateBeta();
+        });
+
+        $("#alpha").change(function() {
+            updateBeta();
+        });
+
+        $("#beta").change(function() {
+            updateBeta();
+        });
+
+        /* Math: ******************************************************************************/
+
+        function betaPDF(x, alpha, beta) {
+            // Function that calculates the beta distribution y from x
+            // and parameters
+            if (alpha + beta > 120) {
+                var bigalpha = math.bignumber(alpha)
+                var bigbeta = math.bignumber(beta)
+                var betafuncval = math.divide(math.gamma(math.add(bigalpha, bigbeta)),
+                    (math.multiply(math.gamma(bigalpha),
+                        math.gamma(bigbeta))));
+            } else {
+                var betafuncval = math.gamma(alpha + beta) /
+                    (math.gamma(alpha) * math.gamma(beta));
+            }
+            return Math.pow(x, alpha - 1) *
+                Math.pow(1 - x, beta - 1) *
+                betafuncval;
+        }
+
+        function calcBeta(alpha, beta) {
+            // Calculate x and y, arrays giving points on the Beta PDF
+            var meanX = alpha / (alpha + beta);
+            var maxY = 1.1 * betaPDF(meanX, alpha, beta);
+            var linexy = [];
+            var credxy = []
+            var credx = 1;
+            var credarea = 0;
+            var credfirst = true;
+            for (var xi = 0; xi <= 1; xi = xi + 0.001) {
+                yi = betaPDF(xi, alpha, beta)
+                if (isFinite(yi)) {
+                    linexy.push([xi, yi]);
+                }
+                credarea = credarea + yi * 0.001;
+                if (credarea > 0.05) {
+                    if (credfirst) {
+                        credx = xi;
+                        credxy.push([xi, 0]);
+                        credfirst = false;
+                    }
+                    if (isFinite(yi)) {
+                        credxy.push([xi, yi]);
+                    } else {
+                        credxy.push([xi, maxY]);
+                    }
+                }
+            }
+            credxy.push([1, 0]);
+            return [linexy, credxy];
+        }
+
+        /* Draw using d3: *********************************************************************/
+
+        function updateBeta() {
+            var width = 800,
+                height = 400,
+                margin = 40;
+
+            var alpha = Number($("#alpha").val());
+            var beta = Number($("#beta").val());
+            var meanX = alpha / (alpha + beta);
+            var maxY = 1.1 * betaPDF(meanX, alpha, beta);
+
+            var vis = d3.select("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            var xscale = d3.scale.linear()
+                .domain([0, 1])
+                .range([0 + margin, width - margin]);
+            var yscale = d3.scale.linear()
+                .domain([maxY, 0])
+                .range([0 + margin, height - margin]);
+
+            // Draw the Beta PDF and credible area.
+            var lineFunction = d3.svg.line()
+                .x(function(d) {
+                    return xscale(d[0]);
+                })
+                .y(function(d) {
+                    return yscale(d[1]);
+                })
+                .interpolate("linear");
+
+            var calcbeta = calcBeta(alpha, beta);
+            var linexy = calcbeta[0];
+            var credxy = calcbeta[1];
+            d3.select("path.betaline")
+                .transition()
+                .attr("d", lineFunction(linexy));
+
+            // X-axis.
+            var xAxis = d3.svg.axis().scale(xscale).orient("bottom");
+            d3.select("g.xaxis")
+                .transition()
+                .attr("transform", "translate(0," + (height - margin) + ")")
+                .call(xAxis);
+
+            // Y-axis.
+            var yAxis = d3.svg.axis().scale(yscale).orient("left");
+            d3.select("g.yaxis")
+                .transition()
+                .attr("transform", "translate(" + margin + ",0)")
+                .call(yAxis);
+        }
+
+        /* Initialization *********************************************************************/
+
+        function initialize() {
+            var k = Number($("#k").val());
+            var n = Number($("#n").val());
+            $("#alpha").val(k + 1);
+            $("#beta").val(n - k + 1);
+            updateBeta();
+        }
+        initialize();
+    </script>
 </body>
 
 </html>
