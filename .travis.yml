@@ -5,3 +5,7 @@ jobs:
     - name: omnilint
       install: docker pull lpenz/omnilint
       script: docker run --rm -v "$PWD:$PWD" -e "RWD=$PWD" -e "MY_UID=$UID" lpenz/omnilint
+    - name: linkchecker
+      addons: { apt: { packages: [ linkchecker ] } }
+      script: linkchecker index.html
+
