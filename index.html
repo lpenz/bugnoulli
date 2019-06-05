@@ -42,19 +42,31 @@
             padding: 10px;
             margin-top: 10px;
         }
+
+        input.params {
+            width: 3em;
+        }
     </style>
 </head>
 
 <body>
 
-    <div class="container">
+    <nav class="navbar navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="#">Probability calculator</a>
+        </div>
+    </nav>
 
-        <h1>bugnoulli</h1>
+    <div class="container">
 
         <form>
             <p>There were
-                <input id="k" type="number" value="1" style="width: 3em;" /> instances in
-                <input id="n" type="number" value="5" style="width: 3em;" /> attempts.</p>
+                <input class="params d-print-none" id="k" type="number" value="1" />
+                <span class="params d-none d-print-inline" id="k"></span> instances in
+                <input class="params d-print-none" id="n" type="number" value="5" />
+                <span class="params d-none d-print-inline" id="n"></span> attempts.
+            </p>
+
             <p>The distribution of \(p\) of the corresponding binomial distribution has the following shape:</p>
         </form>
 
@@ -81,8 +93,8 @@
         /* Get inputs for graph: **************************************************************/
 
         function sanitizeForm(changed) {
-            var k = Number($("#k").val());
-            var n = Number($("#n").val());
+            var k = Number($("input.params#k").val());
+            var n = Number($("input.params#n").val());
             if (k < 0) {
                 k = 0;
             }
@@ -96,15 +108,15 @@
                     k = n;
                 }
             }
-            $("#k").val(k);
-            $("#n").val(n);
-            updateBeta();
+            $("input.params#k").val(k);
+            $("input.params#n").val(n);
+            update();
         }
 
-        $("#k").change(function() {
+        $("input.params#k").change(function() {
             sanitizeForm("k");
         });
-        $("#n").change(function() {
+        $("input.params#n").change(function() {
             sanitizeForm("n");
         });
 
@@ -162,13 +174,15 @@
 
         /* Draw using d3: *********************************************************************/
 
-        function updateBeta() {
+        function update() {
             var width = 800,
                 height = 480,
                 margin = 40;
 
             var k = Number($("#k").val());
             var n = Number($("#n").val());
+            $("span.params#k").text(k);
+            $("span.params#n").text(n);
             var alpha = k + 1;
             var beta = n - k + 1;
             var meanX = alpha / (alpha + beta);
@@ -260,7 +274,7 @@
 
         /* Initialization *********************************************************************/
 
-        updateBeta();
+        update();
     </script>
 </body>
 
