@@ -1,12 +1,12 @@
 ---
 name: CI
-on: [ push, pull_request ]
+on:  # yamllint disable-line rule:truthy
+  - workflow_dispatch
+  - push
+  - pull_request
 jobs:
   omnilint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: docker://lpenz/omnilint:v0.2
+    uses: lpenz/omnilint/.github/workflows/omnilint.yml@v0.5.2
   linkcheck:
     runs-on: ubuntu-latest
     steps:
